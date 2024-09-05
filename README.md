@@ -35,46 +35,48 @@ The list of parts you’ll need to put together a Raspberry Pi cluster — somet
 	1. ssh into your head node.
 	
 		```
-		ssh ian@pihead.local
+		ssh pi@pihead.local
+		sudo su -
 		```
 	1. Install DHCP Server
 	
 		```
-		sudo apt install isc-dhcp-server
+		apt install isc-dhcp-server
 		```
 	1. and then edit the /etc/dhcp/dhcpd.conf file as follows:
 
 		```
 		# The internal cluster network
-	group {
-	   option broadcast-address 10.10.10.255;
-	   #option routers 10.10.10.1;
-	   default-lease-time 600;
-	   max-lease-time 7200;
-	   option domain-name "local";
-	   option domain-name-servers 8.8.8.8, 8.8.4.4;
-	   subnet 10.10.10.0 netmask 255.255.255.0 {
-	      range 10.10.10.10 10.10.10.250;
-	      # Head Node
-	      host pihead {
-	         hardware ethernet 2c:cf:67:74:7f:b6;
-	         fixed-address 10.10.10.1;
-	      }
-	      host pinode1 {
-	         hardware ethernet 2c:cf:67:74:7f:75;
-	         fixed-address 10.10.10.11;
-	         option host-name "pinode1";
-	      }
-	      host pinode2 {
-	         hardware ethernet 2c:cf:67:74:7f:5f;
-	         fixed-address 10.10.10.12;
-	         option host-name "pinode2";
-	      }
-	      host pinode3 {
-	         hardware ethernet 2c:cf:67:74:7f:fe;
-	         fixed-address 10.10.10.13;
-	         option host-name "pinode3";
-	      }
+		group {
+		   option broadcast-address 10.10.10.255;
+		   #option routers 10.10.10.1;
+		   default-lease-time 600;
+		   max-lease-time 7200;
+		   option domain-name "local";
+		   option domain-name-servers 8.8.8.8, 8.8.4.4;
+		   subnet 10.10.10.0 netmask 255.255.255.0 {
+		      range 10.10.10.10 10.10.10.250;
+		      # Head Node
+		      host pihead {
+		         hardware ethernet 2c:cf:67:74:7f:b6;
+		         fixed-address 10.10.10.1;
+		      }
+		      host pinode1 {
+		         hardware ethernet 2c:cf:67:74:7f:75;
+		         fixed-address 10.10.10.11;
+		         option host-name "pinode1";
+		      }
+		      host pinode2 {
+		         hardware ethernet 2c:cf:67:74:7f:5f;
+		         fixed-address 10.10.10.12;
+		         option host-name "pinode2";
+		      }
+		      host pinode3 {
+		         hardware ethernet 2c:cf:67:74:7f:fe;
+		         fixed-address 10.10.10.13;
+		         option host-name "pinode3";
+		      }
+		   }
 	   }
 		```
 	1. Then edit the /etc/default/isc-dhcp-server file to reflect our new server setup:
@@ -111,9 +113,9 @@ The list of parts you’ll need to put together a Raspberry Pi cluster — somet
 	1. Restart the sshd server
 
 		```
-		sudo systemctl restart ssh
+		$ systemctl restart ssh
 		```
-	1. Generate our public/private key pair and
+	1. Generate public/private key pair on the head node
 
 		```
 		$ ssh-keygen -t rsa -b 4096 -C "pi@cluster"
@@ -148,11 +150,16 @@ The list of parts you’ll need to put together a Raspberry Pi cluster — somet
 
 1. Setup an NFS shared drive to distribute all the configs and binaries.
 		
-	1. Create folder on the head node.
+	1. Install the NFS server software
 
 		```
-		sudo mkdir /mnt/scratch
-		sudo chown pi:pi /mnt/scratch
+		$ apt install nfs-kernel-server
+		```
+	2. Create folder on the head node.
+
+		```
+		mkdir /mnt/scratch
+		chown pi:pi /mnt/scratch
 		```
 	1. Edit the /etc/exports file to add a list of IP addresses from which you want to be able to mount your disk
 
@@ -162,15 +169,15 @@ The list of parts you’ll need to put together a Raspberry Pi cluster — somet
 	1. Enable, and then start, both the rpcbind and nfs-server services.
 
 		```
-		$ sudo systemctl enable rpcbind.service
-		$ sudo systemctl start rpcbind.service
-		$ sudo systemctl enable nfs-server.service
-		$ sudo systemctl start nfs-server.service
+		$ systemctl enable rpcbind.service
+		$ systemctl start rpcbind.service
+		$ systemctl enable nfs-server.service
+		$ systemctl start nfs-server.service
 		```
 	1. Reboot
 
 		```
-		$ sudo reboot
+		$ reboot
 		```
 	1. On each node, edit /etc/fstab and add the line.
 
@@ -180,8 +187,9 @@ The list of parts you’ll need to put together a Raspberry Pi cluster — somet
 	1. Mount the NFS drive.
 
 		```
-		$ sudo mkdir /mnt/scratch
-		$ sudo mount /mnt/scratch
+		$ systemctl daemon-reload
+		$ mkdir /mnt/scratch
+		$ mount /mnt/scratch
 		```
 		
 ## Setup GridGain Cluster
@@ -191,25 +199,25 @@ The list of parts you’ll need to put together a Raspberry Pi cluster — somet
 1. Create the gridgain user on each node.
 
 	```
-	$ sudo groupadd -g2000 gridgain
+	$ groupadd -g2000 gridgain
 	```
 1. Create the gridgain user on each node.
 
 	```
-	$ sudo useradd -g2000 -m gridgain
-	$ sudo passwd gridgain
+	$ useradd -g2000 -m gridgain
+	$ passwd gridgain
 	```
 1. Setup Java
 	1. Download and install [JVM](https://www.azul.com/downloads/?version=java-17-lts&os=linux&architecture=arm-64-bit&package=jdk#zulu)
 
 		```
-	$ sudo mkdir -p /usr/lib/jvm/ && sudo tar zxvf zulu11.45.27-ca-jdk11.0.10-linux_aarch32hf.tar.gz -C /usr/lib/jvm/
+	$  mkdir -p /usr/lib/jvm/ &&  tar zxvf /mnt/scratch/zulu17.52.17-ca-jdk17.0.12-linux_aarch64.tar.gz -C /usr/lib/jvm/
 		```
 	1. Configure Zulu Java as default
 
 		```
-		$ update-alternatives --install /usr/bin/java java /usr/lib/jvm/zulu11.45.27-ca-jdk11.0.10-linux_aarch32hf/bin/java 100
-		$ update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/zulu11.45.27-ca-jdk11.0.10-linux_aarch32hf/bin/javac 100
+		$ update-alternatives --install /usr/bin/java java /usr/lib/jvm/zulu17.52.17-ca-jdk17.0.12-linux_aarch64/bin/java 100
+		$ update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/zulu17.52.17-ca-jdk17.0.12-linux_aarch64/bin/javac 100
 		$ update-alternatives --display java && update-alternatives --display javac
 		```
 	1.	Check if its installed
@@ -222,13 +230,10 @@ The list of parts you’ll need to put together a Raspberry Pi cluster — somet
 	1. Extract the binaries.
 
 		```
-		$ mkdir /opt
-		$ chown gridgain:gridgain /opt
-		$ su - gridgain
 		$ cd /opt
 		$ unzip /mnt/scratch/gridgain-control-center-on-premise-2024.2.zip
 		$ ln -s gridgain-control-center-on-premise-2024.2 control-center
-		```
+		$ chown gridgain:gridgain /opt/gridgain*		```
 	1. Edit /lib/systemd/system/gridgain-control-center.service
 
 		```
@@ -266,25 +271,23 @@ The list of parts you’ll need to put together a Raspberry Pi cluster — somet
 	2. Monitor the startup logs.
 
 		```
-		journalctl -u gridgain-control-center.service -f
+		$ journalctl -u gridgain-control-center.service -f
 		```
 1. Setup GridGain on cluster nodes
 	1. Extract the binaries.
 
 		```
-		$ mkdir /opt
-		$ chown gridgain:gridgain /opt
-		$ su - gridgain
 		$ cd /opt
 		$ unzip /mnt/scratch/gridgain-community-8.9.10.zip
 		$ ln -s gridgain-community-8.9.10 gridgain
+		$ chown gridgain:gridgain /opt/gridgain*
 		```
 	1. Enable Control Center agent.
 
 		```
 		$ cp -r /opt/gridgain/libs/optional/control-center-agent /opt/gridgain/libs
 		```
-	1. Edit /lib/systemd/system/gridgain-control-center.service
+	1. Edit /lib/systemd/system/gridgain.service
 
 		```
 		[Unit]
@@ -328,6 +331,7 @@ The list of parts you’ll need to put together a Raspberry Pi cluster — somet
 		1. Login to one of the cluster nodes as gridgain user and tell it where to find Control Center.
 	
 			```
+			$ su - gridgain
 			$ /opt/gridgain/bin/management.sh --uri http://10.10.10.1:3000
 			
 			Control utility [ver. 8.9.10#20240813-sha1:c80a01dc]
